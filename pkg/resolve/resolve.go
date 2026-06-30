@@ -55,6 +55,11 @@ func ImageTags(ctx context.Context, log logr.Logger, config *rest.Config, n *yam
 		Keychain:     kc,
 		SkipPrefixes: &skipPrefixes,
 	}
+	volumeImageTagFilter := &VolumeImageTagFilter{
+		Log:          log,
+		Keychain:     kc,
+		SkipPrefixes: &skipPrefixes,
+	}
 	// if input is a CronJob, we need to look up the image tags in the
 	// `spec.jobTemplate.spec.template.spec` path as well
 	if n.GetKind() == "CronJob" {
@@ -62,6 +67,7 @@ func ImageTags(ctx context.Context, log logr.Logger, config *rest.Config, n *yam
 			yaml.Lookup("spec", "jobTemplate", "spec", "template", "spec"),
 			yaml.Tee(yaml.Lookup("containers"), imageTagFilter),
 			yaml.Tee(yaml.Lookup("initContainers"), imageTagFilter),
+			yaml.Tee(yaml.Lookup("volumes"), volumeImageTagFilter),
 		)
 	}
 	// otherwise, we look up the image tags in the `spec.template.spec` path
@@ -69,9 +75,11 @@ func ImageTags(ctx context.Context, log logr.Logger, config *rest.Config, n *yam
 		yaml.Lookup("spec"),
 		yaml.Tee(yaml.Lookup("containers"), imageTagFilter),
 		yaml.Tee(yaml.Lookup("initContainers"), imageTagFilter),
+		yaml.Tee(yaml.Lookup("volumes"), volumeImageTagFilter),
 		yaml.Lookup("template", "spec"),
 		yaml.Tee(yaml.Lookup("containers"), imageTagFilter),
 		yaml.Tee(yaml.Lookup("initContainers"), imageTagFilter),
+		yaml.Tee(yaml.Lookup("volumes"), volumeImageTagFilter),
 	)
 }
 
@@ -115,6 +123,52 @@ func (f *ImageTagFilter) filterImage(n *yaml.RNode) error {
 	f.Log.V(1).Info("resolved tag to digest", "image", image, "digest", digest)
 	imageWithDigest := fmt.Sprintf("%s@%s", image, digest)
 	n.Pipe(yaml.Lookup("image"), yaml.Set(yaml.NewStringRNode(imageWithDigest)))
+	return nil
+}
+
+// VolumeImageTagFilter resolves image tags to digests
+type VolumeImageTagFilter struct {
+	Log          logr.Logger
+	Keychain     authn.Keychain
+	SkipPrefixes *[]string
+}
+
+var _ yaml.Filter = &VolumeImageTagFilter{}
+
+// Filter to resolve image tags to digests for a list of image volumes
+func (f *VolumeImageTagFilter) Filter(n *yaml.RNode) (*yaml.RNode, error) {
+	if err := n.VisitElements(f.filterImage); err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
+func (f *VolumeImageTagFilter) filterImage(n *yaml.RNode) error {
+	imageNode, err := n.Pipe(yaml.Lookup("image", "reference"))
+	if err != nil {
+		s, _ := n.String()
+		return fmt.Errorf("could not lookup image in node %v: %w", s, err)
+	}
+	if imageNode.IsNil() {
+		return nil // Not an image volume
+	}
+	image := yaml.GetValue(imageNode)
+	for _, prefix := range *f.SkipPrefixes {
+		if strings.HasPrefix(image, prefix) {
+			// Image should be excluded from digest resolution
+			return nil
+		}
+	}
+	if strings.Contains(image, "@") {
+		return nil // already has digest, skip
+	}
+	digest, err := resolveTagFn(image, f.Keychain)
+	if err != nil {
+		return fmt.Errorf("could not get digest for %s: %w", image, err)
+	}
+	f.Log.V(1).Info("resolved tag to digest", "image", image, "digest", digest)
+	imageWithDigest := fmt.Sprintf("%s@%s", image, digest)
+	n.Pipe(yaml.Lookup("image", "reference"), yaml.Set(yaml.NewStringRNode(imageWithDigest)))
 	return nil
 }
 

@@ -20,6 +20,19 @@ spec:
   containers:
   - name: hello
     image: gcr.io/google-containers/pause:3.2
+    volumeMounts:
+    - name: imagevol
+      mountPath: /imagevol
+    - name: cfmap
+      mountPath: /cfmap
   initContainers:
   - name: init
     image: gcr.io/google-samples/hello-app:1.0
+  volumes:
+  - name: imagevol
+    image:
+      reference: alpine:3.24.0
+      pullPolicy: IfNotPresent
+  - name: cfmap
+    configMap:
+      name: someconfigmap

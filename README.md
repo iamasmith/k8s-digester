@@ -13,6 +13,11 @@ It replaces container image references that use tags:
 spec:
   containers:
   - image: gcr.io/google-containers/echoserver:1.10
+...
+  volumes:
+  - name: alpine
+    image:
+      reference: alpine:3.24.0
 ```
 
 With references that use the image digest:
@@ -21,6 +26,11 @@ With references that use the image digest:
 spec:
   containers:
   - image: gcr.io/google-containers/echoserver:1.10@sha256:cb5c1bddd1b5665e1867a7fa1b5fa843a47ee433bbb75d4293888b71def53229
+...
+  volumes:
+  - name: alpine
+    image:
+      reference: alpine:3.24.0@sh256:9b70e313681f44d32991ec943f89228bc91d7431d4a84feafc269a76e3f96a63
 ```
 
 Digester can run either as a
