@@ -96,7 +96,7 @@ func Test_ImageTagFilter_filterImage_Container(t *testing.T) {
 }
 
 func Test_ImageTags_Pod(t *testing.T) {
-	node, err := createPodNode([]string{"image0", "image1"}, []string{"image2", "image3"}, []string{"image4", "image5"})
+	node, err := createPodNode([]string{"image0", "image1"}, []string{"image2", "image3"}, []string{"image4", "image5"}, []string{"image6", "image7"})
 	if err != nil {
 		t.Fatalf("could not create pod node: %v", err)
 	}
@@ -112,10 +112,14 @@ func Test_ImageTags_Pod(t *testing.T) {
 	assertContainer(t, node, "image3@sha256:b0542da3f90bad69318e16ec7fcb6b13b089971886999e08bec91cea34891f0f", "spec", "initContainers", "[name=initcontainer1]")
 	assertContainer(t, node, "image4@sha256:9ca97c69ef7957a20eb9747ae40ae1d7c1326736b68fc75a74b25742c3f1fecd", "spec", "ephemeralContainers", "[name=ephemeralcontainer0]")
 	assertContainer(t, node, "image5@sha256:51077af79f2b143d082e17640704cec760301d4e266ec868147f0cef3e329a48", "spec", "ephemeralContainers", "[name=ephemeralcontainer1]")
+	assertVolume(t, node, "image6@sha256:1784bd594937e738736f37270cdf5dfd35a4a2a5370fcbe7a317fb79395cbb55", "spec", "volumes", "[name=imagevolume0]", "image")
+	assertVolume(t, node, "image7@sha256:c9d106729b04a3ff840fed2ccd77895c90f3311b725c14b0e4a3100d66425a24", "spec", "volumes", "[name=imagevolume1]", "image")
+	assertVolume(t, node, "image6", "spec", "volumes", "[name=othervolume0]", "other")
+	assertVolume(t, node, "image7", "spec", "volumes", "[name=othervolume1]", "other")
 }
 
 func Test_ImageTags_Pod_Skip_Prefixes(t *testing.T) {
-	node, err := createPodNode([]string{"image0", "skip1.local/image1"}, []string{"image2", "skip2.local/image3"}, []string{})
+	node, err := createPodNode([]string{"image0", "skip1.local/image1"}, []string{"image2", "skip2.local/image3"}, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("could not create pod node: %v", err)
 	}
@@ -132,7 +136,7 @@ func Test_ImageTags_Pod_Skip_Prefixes(t *testing.T) {
 }
 
 func Test_ImageTags_CronJob(t *testing.T) {
-	node, err := createCronJobNode([]string{"image0", "image1"}, []string{"image2", "image3"})
+	node, err := createCronJobNode([]string{"image0", "image1"}, []string{"image2", "image3"}, []string{"image4", "image5"})
 	if err != nil {
 		t.Fatalf("could not create pod node: %v", err)
 	}
@@ -146,10 +150,14 @@ func Test_ImageTags_CronJob(t *testing.T) {
 	assertContainer(t, node, "image1@sha256:cc292b92ce7f10f2e4f727ecdf4b12528127c51b6ddf6058e213674603190d06", "spec", "jobTemplate", "spec", "template", "spec", "containers", "[name=container1]")
 	assertContainer(t, node, "image2@sha256:5bb21ac469b5e7df4e17899d4aae0adfb430f0f0b336a2242ef1a22d25bd2e53", "spec", "jobTemplate", "spec", "template", "spec", "initContainers", "[name=initcontainer0]")
 	assertContainer(t, node, "image3@sha256:b0542da3f90bad69318e16ec7fcb6b13b089971886999e08bec91cea34891f0f", "spec", "jobTemplate", "spec", "template", "spec", "initContainers", "[name=initcontainer1]")
+	assertVolume(t, node, "image4@sha256:9ca97c69ef7957a20eb9747ae40ae1d7c1326736b68fc75a74b25742c3f1fecd", "spec", "jobTemplate", "spec", "template", "spec", "volumes", "[name=imagevolume0]", "image")
+	assertVolume(t, node, "image5@sha256:51077af79f2b143d082e17640704cec760301d4e266ec868147f0cef3e329a48", "spec", "jobTemplate", "spec", "template", "spec", "volumes", "[name=imagevolume1]", "image")
+	assertVolume(t, node, "image4", "spec", "jobTemplate", "spec", "template", "spec", "volumes", "[name=othervolume0]", "other")
+	assertVolume(t, node, "image5", "spec", "jobTemplate", "spec", "template", "spec", "volumes", "[name=othervolume1]", "other")
 }
 
 func Test_ImageTags_Deployment(t *testing.T) {
-	node, err := createDeploymentNode([]string{"image0", "image1"}, []string{"image2", "image3"})
+	node, err := createDeploymentNode([]string{"image0", "image1"}, []string{"image2", "image3"}, []string{"image4", "image5"})
 	if err != nil {
 		t.Fatalf("could not create deployment node: %v", err)
 	}
@@ -163,12 +171,28 @@ func Test_ImageTags_Deployment(t *testing.T) {
 	assertContainer(t, node, "image1@sha256:cc292b92ce7f10f2e4f727ecdf4b12528127c51b6ddf6058e213674603190d06", "spec", "template", "spec", "containers", "[name=container1]")
 	assertContainer(t, node, "image2@sha256:5bb21ac469b5e7df4e17899d4aae0adfb430f0f0b336a2242ef1a22d25bd2e53", "spec", "template", "spec", "initContainers", "[name=initcontainer0]")
 	assertContainer(t, node, "image3@sha256:b0542da3f90bad69318e16ec7fcb6b13b089971886999e08bec91cea34891f0f", "spec", "template", "spec", "initContainers", "[name=initcontainer1]")
+	assertVolume(t, node, "image4@sha256:9ca97c69ef7957a20eb9747ae40ae1d7c1326736b68fc75a74b25742c3f1fecd", "spec", "template", "spec", "volumes", "[name=imagevolume0]", "image")
+	assertVolume(t, node, "image5@sha256:51077af79f2b143d082e17640704cec760301d4e266ec868147f0cef3e329a48", "spec", "template", "spec", "volumes", "[name=imagevolume1]", "image")
+	assertVolume(t, node, "image4", "spec", "template", "spec", "volumes", "[name=othervolume0]", "other")
+	assertVolume(t, node, "image5", "spec", "template", "spec", "volumes", "[name=othervolume1]", "other")
 }
 
 func assertContainer(t *testing.T, n *yaml.RNode, imageWithDigest string, path ...string) {
 	container, err := n.Pipe(yaml.Lookup(path...), yaml.Get("image"))
 	if err != nil {
 		t.Fatalf("could not find container-0: %v", err)
+	}
+	got := yaml.GetValue(container)
+	want := imageWithDigest
+	if want != got {
+		t.Errorf("wanted [%s], got [%s]", want, got)
+	}
+}
+
+func assertVolume(t *testing.T, n *yaml.RNode, imageWithDigest string, path ...string) {
+	container, err := n.Pipe(yaml.Lookup(path...), yaml.Get("reference"))
+	if err != nil {
+		t.Fatalf("could not find volume-0: %v", err)
 	}
 	got := yaml.GetValue(container)
 	want := imageWithDigest

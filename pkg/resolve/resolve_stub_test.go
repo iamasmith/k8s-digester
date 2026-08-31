@@ -20,7 +20,20 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-func createPodNode(containerImages []string, initContainerImages []string, ephemeralContainerImages []string) (*yaml.RNode, error) {
+func createVolumeNode(name string, variant string, image string) (*yaml.Node, error) {
+	vol, err := yaml.FromMap(M{
+		"name": name,
+		variant: M{
+			"reference": image,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return vol.YNode(), nil
+}
+
+func createPodNode(containerImages []string, initContainerImages []string, ephemeralContainerImages []string, volumes []string) (*yaml.RNode, error) {
 	node, err := yaml.FromMap(M{
 		"apiVersion": "v1",
 		"kind":       "Pod",
@@ -64,10 +77,26 @@ func createPodNode(containerImages []string, initContainerImages []string, ephem
 			return nil, err
 		}
 	}
+	for index, image := range volumes {
+		imageVolume, err := createVolumeNode(fmt.Sprintf("imagevolume%d", index), "image", image)
+		if err != nil {
+			return nil, err
+		}
+		nonImageVolume, err := createVolumeNode(fmt.Sprintf("othervolume%d", index), "other", image)
+		if err != nil {
+			return nil, err
+		}
+		if err := node.PipeE(
+			yaml.LookupCreate(yaml.SequenceNode, "spec", "volumes"),
+			yaml.Append(imageVolume, nonImageVolume),
+		); err != nil {
+			return nil, err
+		}
+	}
 	return node, nil
 }
 
-func createCronJobNode(containerImages []string, initContainerImages []string) (*yaml.RNode, error) {
+func createCronJobNode(containerImages []string, initContainerImages []string, volumes []string) (*yaml.RNode, error) {
 	node, err := yaml.FromMap(M{
 		"apiVersion": "batch/v1beta1",
 		"kind":       "CronJob",
@@ -100,10 +129,26 @@ func createCronJobNode(containerImages []string, initContainerImages []string) (
 			return nil, err
 		}
 	}
+	for index, image := range volumes {
+		imageVolume, err := createVolumeNode(fmt.Sprintf("imagevolume%d", index), "image", image)
+		if err != nil {
+			return nil, err
+		}
+		nonImageVolume, err := createVolumeNode(fmt.Sprintf("othervolume%d", index), "other", image)
+		if err != nil {
+			return nil, err
+		}
+		if err := node.PipeE(
+			yaml.LookupCreate(yaml.SequenceNode, "spec", "jobTemplate", "spec", "template", "spec", "volumes"),
+			yaml.Append(imageVolume, nonImageVolume),
+		); err != nil {
+			return nil, err
+		}
+	}
 	return node, nil
 }
 
-func createDeploymentNode(containerImages []string, initContainerImages []string) (*yaml.RNode, error) {
+func createDeploymentNode(containerImages []string, initContainerImages []string, volumes []string) (*yaml.RNode, error) {
 	node, err := yaml.FromMap(M{
 		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
@@ -132,6 +177,22 @@ func createDeploymentNode(containerImages []string, initContainerImages []string
 				"name":  fmt.Sprintf("initcontainer%d", index),
 				"image": image,
 			}).YNode()),
+		); err != nil {
+			return nil, err
+		}
+	}
+	for index, image := range volumes {
+		imageVolume, err := createVolumeNode(fmt.Sprintf("imagevolume%d", index), "image", image)
+		if err != nil {
+			return nil, err
+		}
+		nonImageVolume, err := createVolumeNode(fmt.Sprintf("othervolume%d", index), "other", image)
+		if err != nil {
+			return nil, err
+		}
+		if err := node.PipeE(
+			yaml.LookupCreate(yaml.SequenceNode, "spec", "template", "spec", "volumes"),
+			yaml.Append(imageVolume, nonImageVolume),
 		); err != nil {
 			return nil, err
 		}
